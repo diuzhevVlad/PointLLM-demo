@@ -143,6 +143,11 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
         conv_state.reset()
         return [], 0
 
+    def ask_point_description(x, y, z, history):
+        history = [] if history is None else history
+        question = f"What is loacted at coordinates ({x}, {y}, {z}) of point cloud?"
+        return history + [[question, None]]
+
     def answer_generate(history, answer_time, point_clouds, conv_state):
         history = [] if history is None else history
         if not history:
@@ -267,6 +272,11 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 container=False,
             )
             send_btn = gr.Button("Send")
+        with gr.Row():
+            coord_x = gr.Number(label="X coordinate", value=0.0)
+            coord_y = gr.Number(label="Y coordinate", value=0.0)
+            coord_z = gr.Number(label="Z coordinate", value=0.0)
+            describe_btn = gr.Button("Describe Point")
         clear_btn = gr.Button("Clear Conversation")
 
         confirm_btn.click(
@@ -278,6 +288,11 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
         ).then(lambda x: x + 1, answer_time, answer_time)
         send_btn.click(user, [text_input, chatbot], [text_input, chatbot], queue=False).then(
+            answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
+        ).then(lambda x: x + 1, answer_time, answer_time)
+        describe_btn.click(
+            ask_point_description, inputs=[coord_x, coord_y, coord_z, chatbot], outputs=chatbot
+        ).then(
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
         ).then(lambda x: x + 1, answer_time, answer_time)
         clear_btn.click(clear_conv, inputs=[chatbot, conv_state], outputs=[chatbot, answer_time], queue=False)
