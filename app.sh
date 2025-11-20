@@ -1,0 +1,1 @@
+PYTHONPATH=$PWD python3 pointllm/eval/chat_gradio.py --model_name /app/weights/models--RunsenXu--PointLLM_7B_v1.2/snapshots/37d8c15aaff8e7e05f04729dcb6960d5758e9f86 --data_path data/chosen/

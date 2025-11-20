@@ -43,8 +43,8 @@ def init_model(args):
     print(f'[INFO] Model name: {os.path.basename(model_name)}')
     logging.warning(f'Model name: {os.path.basename(model_name)}')
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir="/app/weights")
-    model = PointLLMLlamaForCausalLM.from_pretrained(model_name, low_cpu_mem_usage=False, use_cache=True, torch_dtype=args.torch_dtype, cache_dir="/app/weights").cuda()
+    tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir="/app/weights", force_download=False)
+    model = PointLLMLlamaForCausalLM.from_pretrained(model_name, low_cpu_mem_usage=False, use_cache=True, torch_dtype=args.torch_dtype, cache_dir="/app/weights", force_download=False).cuda()
     model.initialize_tokenizer_point_backbone_config_wo_embedding(tokenizer)
 
     model.eval()

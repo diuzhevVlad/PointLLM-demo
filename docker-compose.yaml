@@ -10,9 +10,9 @@ services:
     ports:
       - "7810:7810"   # hostPort:containerPort
     volumes:
-      - ./weights:/app/weights
-      - ./pointllm:/app/pointllm      
+      - .:/app      
     runtime: nvidia  # This allows GPU access
     # Optional: specify GPU count if needed, 'all' grants access to all GPUs
     environment:
       - NVIDIA_VISIBLE_DEVICES=all  # Grants access to all GPUs (you can specify a GPU ID, e.g., 0, 1, etc.)
+    command: ["/app/app.sh"]
