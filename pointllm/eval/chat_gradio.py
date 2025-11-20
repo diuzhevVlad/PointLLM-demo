@@ -1,3 +1,6 @@
+# PYTHONPATH=$PWD python3 pointllm/eval/chat_gradio.py --model_name RunsenXu/PointLLM_7B_v1.2 --data_path data/chosen/
+
+
 import argparse
 from transformers import AutoTokenizer
 import torch
@@ -40,8 +43,8 @@ def init_model(args):
     print(f'[INFO] Model name: {os.path.basename(model_name)}')
     logging.warning(f'Model name: {os.path.basename(model_name)}')
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = PointLLMLlamaForCausalLM.from_pretrained(model_name, low_cpu_mem_usage=False, use_cache=True).cuda()
+    tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir="/app/weights")
+    model = PointLLMLlamaForCausalLM.from_pretrained(model_name, low_cpu_mem_usage=False, use_cache=True, torch_dtype=args.torch_dtype, cache_dir="/app/weights").cuda()
     model.initialize_tokenizer_point_backbone_config_wo_embedding(tokenizer)
 
     model.eval()
@@ -170,7 +173,7 @@ def start_conversation(args, model, tokenizer, point_backbone_config, keywords, 
             if 8192 < points.shape[0]:
                 points = farthest_point_sample(points, 8192)
             point_clouds = pc_norm(points)
-            point_clouds = torch.from_numpy(point_clouds).unsqueeze_(0).to(torch.float32).cuda()
+            point_clouds = torch.from_numpy(point_clouds).unsqueeze_(0).to(args.torch_dtype).cuda()
             
             answer_time = 0
             conv.reset()
@@ -364,8 +367,18 @@ if __name__ == "__main__":
 
     # For gradio
     parser.add_argument("--port", type=int, default=7810)
+    parser.add_argument("--torch_dtype", type=str, default="bfloat16", choices=["float32", "float16", "bfloat16"])
+
 
     args = parser.parse_args()
+
+    dtype_mapping = {
+        "float32": torch.float32,
+        "float16": torch.float16,
+        "bfloat16": torch.bfloat16,
+    }
+
+    args.torch_dtype = dtype_mapping[args.torch_dtype]
     
     # * make serving dirs
     os.makedirs(os.path.dirname(args.log_file), exist_ok=True)
