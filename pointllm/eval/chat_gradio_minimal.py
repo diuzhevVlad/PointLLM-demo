@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import threading
 import time
 
 import gradio as gr
@@ -105,6 +106,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
     default_point_patch_token = point_backbone_config["default_point_patch_token"]
     default_point_start_token = point_backbone_config["default_point_start_token"]
     default_point_end_token = point_backbone_config["default_point_end_token"]
+    stop_event = threading.Event()
 
     def confirm_point_cloud(file_obj, chatbot, answer_time, conv_state):
         chatbot = [] if chatbot is None else chatbot
@@ -174,6 +176,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
         logging.warning(f"Answer Time: {answer_time}")
         input_text = history[-1][0]
         qs = input_text
+        stop_event.clear()
 
         if answer_time == 0:
             if mm_use_point_start_end:
@@ -231,11 +234,19 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 outputs = outputs[: -len(stop_str)]
             outputs = outputs.strip()
 
+            if stop_event.is_set():
+                conv_state.pop_last_none_message()
+                history[-1][1] = "<span style='color: red;'>[System] Generation interrupted.</span>"
+                yield history
+                return
+
             conv_state.pop_last_none_message()
             conv_state.append_message(conv_state.roles[1], outputs)
             history[-1][1] = ""
             for character in outputs:
                 history[-1][1] += character
+                if stop_event.is_set():
+                    break
                 yield history
         except Exception as exc:
             logging.warning(f"[ERROR] {exc}")
@@ -298,6 +309,26 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             describe_btn = gr.Button("Describe Point")
         clear_btn = gr.Button("Clear Conversation")
 
+        def disable_controls():
+            return (
+                gr.update(interactive=False),  # text_input
+                gr.update(interactive=False),  # send_btn
+                gr.update(interactive=False),  # describe_btn
+                gr.update(interactive=False),  # confirm_btn
+                gr.update(interactive=False),  # device_dropdown
+                gr.update(interactive=False),  # point_cloud_input
+            )
+
+        def enable_controls():
+            return (
+                gr.update(interactive=True),  # text_input
+                gr.update(interactive=True),  # send_btn
+                gr.update(interactive=True),  # describe_btn
+                gr.update(interactive=True),  # confirm_btn
+                gr.update(interactive=True),  # device_dropdown
+                gr.update(interactive=True),  # point_cloud_input
+            )
+
         def change_device(selected_device, chatbot, point_clouds):
             chatbot = [] if chatbot is None else chatbot
             target_device = _resolve_device(selected_device)
@@ -334,23 +365,96 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             note = f"<span style='color: red;'>[System] {' '.join(note_parts)}</span>"
             return gr.update(value=dropdown_value), chatbot + [[None, note]], point_clouds
 
+        def handle_clear(chatbot, conv_state):
+            stop_event.set()
+            conv_state.reset()
+            return [], 0
+
         confirm_btn.click(
             confirm_point_cloud,
             inputs=[point_cloud_input, chatbot, answer_time, conv_state],
             outputs=[plot, chatbot, answer_time, point_clouds],
         )
         text_input.submit(user, [text_input, chatbot], [text_input, chatbot], queue=False).then(
+            disable_controls,
+            inputs=[],
+            outputs=[
+                text_input,
+                send_btn,
+                describe_btn,
+                confirm_btn,
+                device_dropdown,
+                point_cloud_input,
+            ],
+        ).then(
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
+        ).then(
+            enable_controls,
+            inputs=[],
+            outputs=[
+                text_input,
+                send_btn,
+                describe_btn,
+                confirm_btn,
+                device_dropdown,
+                point_cloud_input,
+            ],
         ).then(lambda x: x + 1, answer_time, answer_time)
         send_btn.click(user, [text_input, chatbot], [text_input, chatbot], queue=False).then(
+            disable_controls,
+            inputs=[],
+            outputs=[
+                text_input,
+                send_btn,
+                describe_btn,
+                confirm_btn,
+                device_dropdown,
+                point_cloud_input,
+            ],
+        ).then(
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
+        ).then(
+            enable_controls,
+            inputs=[],
+            outputs=[
+                text_input,
+                send_btn,
+                describe_btn,
+                confirm_btn,
+                device_dropdown,
+                point_cloud_input,
+            ],
         ).then(lambda x: x + 1, answer_time, answer_time)
         describe_btn.click(
             ask_point_description, inputs=[coord_x, coord_y, coord_z, chatbot], outputs=chatbot
         ).then(
+            disable_controls,
+            inputs=[],
+            outputs=[
+                text_input,
+                send_btn,
+                describe_btn,
+                confirm_btn,
+                device_dropdown,
+                point_cloud_input,
+            ],
+        ).then(
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
+        ).then(
+            enable_controls,
+            inputs=[],
+            outputs=[
+                text_input,
+                send_btn,
+                describe_btn,
+                confirm_btn,
+                device_dropdown,
+                point_cloud_input,
+            ],
         ).then(lambda x: x + 1, answer_time, answer_time)
-        clear_btn.click(clear_conv, inputs=[chatbot, conv_state], outputs=[chatbot, answer_time], queue=False)
+        clear_btn.click(
+            handle_clear, inputs=[chatbot, conv_state], outputs=[chatbot, answer_time], queue=False
+        )
         device_dropdown.change(
             change_device,
             inputs=[device_dropdown, chatbot, point_clouds],
