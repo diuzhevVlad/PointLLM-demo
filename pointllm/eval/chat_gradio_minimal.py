@@ -18,16 +18,27 @@ from pointllm.utils import disable_torch_init
 MAX_POINTS = 8192
 
 
+def _resolve_device(device_pref: str) -> torch.device:
+    """Pick the best available device based on the user preference."""
+    if device_pref == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device_pref == "cuda" and not torch.cuda.is_available():
+        logging.warning("CUDA requested but not available. Falling back to CPU.")
+        return torch.device("cpu")
+    return torch.device(device_pref)
+
+
 def init_model(args):
     """Load tokenizer/model and return supporting configs."""
     disable_torch_init()
     model_name = os.path.expanduser(args.model_name)
-    print(f"[INFO] Loading model: {model_name}")
     logging.warning(f"Model name: {model_name}")
 
+    print("Loading tokenizer")
     tokenizer = AutoTokenizer.from_pretrained(
         model_name, cache_dir="/app/weights", force_download=False
     )
+    print("Loading model")
     model = PointLLMLlamaForCausalLM.from_pretrained(
         model_name,
         low_cpu_mem_usage=False,
@@ -35,7 +46,7 @@ def init_model(args):
         torch_dtype=args.torch_dtype,
         cache_dir="/app/weights",
         force_download=False,
-    ).cuda()
+    ).to(args.device)
     model.initialize_tokenizer_point_backbone_config_wo_embedding(tokenizer)
     model.eval()
 
@@ -84,7 +95,7 @@ def _prepare_tensor(points: np.ndarray, colors: np.ndarray, args) -> torch.Tenso
     if points_with_color.shape[0] > MAX_POINTS:
         points_with_color = farthest_point_sample(points_with_color, MAX_POINTS)
     normed = pc_norm(points_with_color)
-    tensor = torch.from_numpy(normed).unsqueeze(0).to(args.torch_dtype).cuda()
+    tensor = torch.from_numpy(normed).unsqueeze(0).to(dtype=args.torch_dtype, device=args.device)
     return tensor
 
 
@@ -191,7 +202,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
         logging.warning("#" * 80)
 
         inputs = tokenizer([prompt])
-        input_ids = torch.as_tensor(inputs.input_ids).cuda()
+        input_ids = torch.as_tensor(inputs.input_ids, device=args.device)
         stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
         stop_str = keywords[0]
 
@@ -252,6 +263,14 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             """
         )
 
+        available_devices = ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
+        device_dropdown = gr.Dropdown(
+            choices=available_devices,
+            value=args.device.type if args.device.type in available_devices else available_devices[0],
+            label="Compute Device",
+            interactive=True,
+        )
+
         with gr.Row():
             with gr.Column(scale=1):
                 point_cloud_input = gr.File(
@@ -263,7 +282,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             with gr.Column(scale=2):
                 plot = gr.Plot(label="Point Cloud Preview")
 
-        chatbot = gr.Chatbot([], elem_id="chatbot", height=560)
+        chatbot = gr.Chatbot([], elem_id="chatbot", height=560, type='tuples')
 
         with gr.Row():
             text_input = gr.Textbox(
@@ -278,6 +297,42 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             coord_z = gr.Number(label="Z coordinate", value=0.0)
             describe_btn = gr.Button("Describe Point")
         clear_btn = gr.Button("Clear Conversation")
+
+        def change_device(selected_device, chatbot, point_clouds):
+            chatbot = [] if chatbot is None else chatbot
+            target_device = _resolve_device(selected_device)
+            target_dtype = args.torch_dtype
+            dtype_note = None
+            note_parts = []
+            dropdown_value = (
+                target_device.type if target_device.type in available_devices else available_devices[0]
+            )
+
+            if selected_device == "cuda" and target_device.type != "cuda":
+                note_parts.append("CUDA not available; using CPU instead.")
+
+            if target_device.type == "cpu" and target_dtype == torch.float16:
+                target_dtype = torch.float32
+                args.torch_dtype = target_dtype
+                dtype_note = "float16 is not fully supported on CPU. Using float32 instead."
+
+            if args.device.type != target_device.type:
+                model.to(device=target_device, dtype=target_dtype)
+                if point_clouds is not None:
+                    point_clouds = point_clouds.to(device=target_device, dtype=target_dtype)
+                args.device = target_device
+                if target_device.type == "cpu" and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()
+                note_parts.insert(0, f"Switched to {target_device.type.upper()}.")
+            else:
+                note_parts.append(f"Already using {target_device.type.upper()}.")
+
+            if dtype_note:
+                note_parts.append(dtype_note)
+
+            note = f"<span style='color: red;'>[System] {' '.join(note_parts)}</span>"
+            return gr.update(value=dropdown_value), chatbot + [[None, note]], point_clouds
 
         confirm_btn.click(
             confirm_point_cloud,
@@ -296,6 +351,11 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
         ).then(lambda x: x + 1, answer_time, answer_time)
         clear_btn.click(clear_conv, inputs=[chatbot, conv_state], outputs=[chatbot, answer_time], queue=False)
+        device_dropdown.change(
+            change_device,
+            inputs=[device_dropdown, chatbot, point_clouds],
+            outputs=[device_dropdown, chatbot, point_clouds],
+        )
 
     demo.queue()
     demo.launch(server_name="0.0.0.0", server_port=args.port, share=False)
@@ -312,6 +372,7 @@ def main():
     parser.add_argument(
         "--torch_dtype", type=str, default="bfloat16", choices=["float32", "float16", "bfloat16"]
     )
+    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda"])
     args = parser.parse_args()
 
     dtype_mapping = {
@@ -320,6 +381,10 @@ def main():
         "bfloat16": torch.bfloat16,
     }
     args.torch_dtype = dtype_mapping[args.torch_dtype]
+    args.device = _resolve_device(args.device)
+    if args.device.type == "cpu" and args.torch_dtype == torch.float16:
+        logging.warning("float16 not fully supported on CPU. Using float32 instead.")
+        args.torch_dtype = torch.float32
 
     os.makedirs(os.path.dirname(args.log_file), exist_ok=True)
     os.makedirs(args.tmp_dir, exist_ok=True)
@@ -337,7 +402,6 @@ def main():
     logging.warning("-----New Run-----")
     logging.warning(f"args: {args}")
     print("-----New Run-----")
-    print(f"[INFO] Args: {args}")
 
     (
         model,
