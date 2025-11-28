@@ -1,18 +1,21 @@
-version: "3.9"
-
 services:
   pointllm:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        UID: ${UID}  # Pass UID from environment variables or .env file
+        GID: ${GID}
     image: pointllm
     container_name: pointllm
     ports:
-      - "7810:7810"   # hostPort:containerPort
+      - "7810:7810"
     volumes:
-      - .:/app      
-    runtime: nvidia  # This allows GPU access
-    # Optional: specify GPU count if needed, 'all' grants access to all GPUs
+      - .:/app
+    runtime: nvidia
+    user: "${UID}:${GID}"
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all  # Grants access to all GPUs (you can specify a GPU ID, e.g., 0, 1, etc.)
+      - NVIDIA_VISIBLE_DEVICES=all
+      - UID=${UID}
+      - GID=${GID}
     command: ["/app/app.sh"]

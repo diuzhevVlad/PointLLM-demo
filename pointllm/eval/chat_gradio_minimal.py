@@ -19,6 +19,28 @@ from pointllm.utils import disable_torch_init
 MAX_POINTS = 8192
 
 
+def _from_pretrained_with_fallback(load_fn, model_name, cache_dir, **kwargs):
+    """Load from local cache first; if missing, fallback to download."""
+    try:
+        print(f"Try to load {model_name} locally with {load_fn}")
+        return load_fn(
+            model_name,
+            cache_dir=cache_dir,
+            force_download=False,
+            local_files_only=True,
+            **kwargs,
+        )
+    except Exception as exc:
+        print(f"Local load failed for {model_name}, downloading from hub: {exc}")
+        return load_fn(
+            model_name,
+            cache_dir=cache_dir,
+            force_download=False,
+            local_files_only=False,
+            **kwargs,
+        )
+
+
 def _resolve_device(device_pref: str) -> torch.device:
     """Pick the best available device based on the user preference."""
     if device_pref == "auto":
@@ -36,17 +58,17 @@ def init_model(args):
     logging.warning(f"Model name: {model_name}")
 
     print("Loading tokenizer")
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name, cache_dir="/app/weights", force_download=False
+    tokenizer = _from_pretrained_with_fallback(
+        AutoTokenizer.from_pretrained, model_name, cache_dir="/app/weights"
     )
     print("Loading model")
-    model = PointLLMLlamaForCausalLM.from_pretrained(
+    model = _from_pretrained_with_fallback(
+        PointLLMLlamaForCausalLM.from_pretrained,
         model_name,
+        cache_dir="/app/weights",
         low_cpu_mem_usage=False,
         use_cache=True,
         torch_dtype=args.torch_dtype,
-        cache_dir="/app/weights",
-        force_download=False,
     ).to(args.device)
     model.initialize_tokenizer_point_backbone_config_wo_embedding(tokenizer)
     model.eval()
@@ -158,7 +180,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
 
     def ask_point_description(x, y, z, history):
         history = [] if history is None else history
-        question = f"What is loacted at coordinates ({x}, {y}, {z}) of point cloud?"
+        question = f"What is located at coordinates ({x}, {y}, {z}) of point cloud?"
         return history + [[question, None]]
 
     def answer_generate(history, answer_time, point_clouds, conv_state):
@@ -293,7 +315,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             with gr.Column(scale=2):
                 plot = gr.Plot(label="Point Cloud Preview")
 
-        chatbot = gr.Chatbot([], elem_id="chatbot", height=560, type='tuples')
+        chatbot = gr.Chatbot([], elem_id="chatbot", height=560)
 
         with gr.Row():
             text_input = gr.Textbox(
