@@ -80,6 +80,7 @@ def init_model(args):
 
     mm_use_point_start_end = getattr(model.config, "mm_use_point_start_end", False)
 
+    print("Model loaded!")
     return model, tokenizer, point_backbone_config, keywords, mm_use_point_start_end, conv
 
 
@@ -284,14 +285,14 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
             history[-1][1] = outputs
             yield history
 
-    with gr.Blocks(title="PointLLM Minimal Chat") as demo:
+    with gr.Blocks(title="PointLLM Chat") as demo:
         answer_time = gr.State(value=0)
         point_clouds = gr.State(value=None)
         conv_state = gr.State(value=conv.copy())
 
         gr.Markdown(
             """
-            # PointLLM Minimal Demo
+            # PointLLM Demo
             Upload a `.npy` point cloud, visualize it, and chat with PointLLM.
             """
         )
@@ -339,6 +340,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 gr.update(interactive=False),  # confirm_btn
                 gr.update(interactive=False),  # device_dropdown
                 gr.update(interactive=False),  # point_cloud_input
+                gr.update(interactive=False),
             )
 
         def enable_controls():
@@ -349,6 +351,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 gr.update(interactive=True),  # confirm_btn
                 gr.update(interactive=True),  # device_dropdown
                 gr.update(interactive=True),  # point_cloud_input
+                gr.update(interactive=True),
             )
 
         def change_device(selected_device, chatbot, point_clouds):
@@ -407,6 +410,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 confirm_btn,
                 device_dropdown,
                 point_cloud_input,
+                clear_btn
             ],
         ).then(
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
@@ -420,6 +424,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 confirm_btn,
                 device_dropdown,
                 point_cloud_input,
+                clear_btn
             ],
         ).then(lambda x: x + 1, answer_time, answer_time)
         send_btn.click(user, [text_input, chatbot], [text_input, chatbot], queue=False).then(
@@ -432,6 +437,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 confirm_btn,
                 device_dropdown,
                 point_cloud_input,
+                clear_btn
             ],
         ).then(
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
@@ -445,6 +451,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 confirm_btn,
                 device_dropdown,
                 point_cloud_input,
+                clear_btn
             ],
         ).then(lambda x: x + 1, answer_time, answer_time)
         describe_btn.click(
@@ -459,6 +466,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 confirm_btn,
                 device_dropdown,
                 point_cloud_input,
+                clear_btn
             ],
         ).then(
             answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot
@@ -472,6 +480,7 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 confirm_btn,
                 device_dropdown,
                 point_cloud_input,
+                clear_btn
             ],
         ).then(lambda x: x + 1, answer_time, answer_time)
         clear_btn.click(
@@ -528,7 +537,6 @@ def main():
     logging.warning("-----New Run-----")
     logging.warning(f"args: {args}")
     print("-----New Run-----")
-
     (
         model,
         tokenizer,
@@ -546,6 +554,7 @@ def main():
         mm_use_point_start_end,
         conv,
     )
+    
 
 
 if __name__ == "__main__":

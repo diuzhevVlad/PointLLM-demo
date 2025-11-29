@@ -6,7 +6,7 @@ services:
       args:
         UID: ${UID}  # Pass UID from environment variables or .env file
         GID: ${GID}
-    image: pointllm
+    image: vladislavdiuzhev/pointllm-demo
     container_name: pointllm
     ports:
       - "7810:7810"
