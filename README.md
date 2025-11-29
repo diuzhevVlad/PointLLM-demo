@@ -1,43 +1,36 @@
 # Point-LLM Demo
 
-This repository contains modified code of original [PointLLM](https://runsenxu.com/projects/PointLLM) project. 
-In particular it provides fixed and improved version of Gradio demo (+ Docker) as part of study project for MIPT course.
+Dockerized Gradio demo for [PointLLM](https://runsenxu.com/projects/PointLLM), polished for smoother local use as part of a MIPT course project.
 
-## Set up
-Load Docker image:
-```
+![Demo screenshot](assets/example.jpg)
+
+## What's inside
+- Two modes: 3D Question Answering and 3D Understanding (coordinate-wise descriptions).
+- Sample point clouds in `data/chosen` (start with a prompt like "Describe point cloud in detail.").
+- Model weights cache to `weights` after first download, enabling offline runs.
+- Docker setup for quick start; see the original project details in `README_old.md`.
+
+## Prerequisites
+- Docker and the Docker Compose plugin installed.
+- ~20 GB free space for the image and another ~20 GB for downloaded weights.
+
+## Quick start
+1) Load the prebuilt image:
+```bash
 docker load vladislavdiuzhev/pointllm-demo
 ```
-or build it locally:
-```
+   or build it locally:
+```bash
 docker compose build
 ```
-
-## Run demo
-Just run:
-```
+2) Launch the demo:
+```bash
 docker compose up
 ```
-The process of loading model can take a while (even after downloading to cache in offline mode it is quite slow...)
+3) Wait until all checkpoint shards are loaded, then open http://0.0.0.0:7810 in your browser.
 
-After the message "Model loaded!" appeared in the terminal you can connect to the app in browser [0.0.0.0:7810](0.0.0.0:7810).
-
-## Instructions
-<div style="text-align: center;">
-    <img src="assets/example.jpg" alt="Dialogue_Teaser" width=75% >
-</div>
-
-Proposed demo realizes 2 scenarios:
-
-1. 3D Question Answering
-2. 3D Understanding (coordinate-wise description)
-
-### Hierarchy
-You can choose point clouds from **data/chosen** directory (try to start the chat with something like "Describe point cloud in details").
-
-**weights** directory will contain huggingface cache after initial download of the model (the second run can be performed without internet connection).
-
-### Tips
-- When using cpu 1 response can be quite long (up to several minutes)
-- In 3D view you can examine coordinates
-- Docker image size is ~ 20Gb as well as loaded weights
+## Usage notes
+- Initial model load is slow, even after the cache is populated.
+- You can inspect coordinates directly in the 3D view.
+- CPU inference can take several minutes per reply; use a GPU if available.
+- Extra point clouds live in the Objaverse dataset (see `README_old.md` for details).
