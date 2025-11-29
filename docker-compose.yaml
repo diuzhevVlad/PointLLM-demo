@@ -12,10 +12,11 @@ services:
       - "7810:7810"
     volumes:
       - .:/app
-    runtime: nvidia
+    runtime: ${DOCKER_RUNTIME:-nvidia}
     user: "${UID}:${GID}"
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
       - UID=${UID}
       - GID=${GID}
+      - START_CPU=${START_CPU:-}
     command: ["/app/app.sh"]

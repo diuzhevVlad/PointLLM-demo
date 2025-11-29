@@ -372,6 +372,23 @@ def start_demo(args, model, tokenizer, point_backbone_config, keywords, mm_use_p
                 args.torch_dtype = target_dtype
                 dtype_note = "float16 is not fully supported on CPU. Using float32 instead."
 
+            if target_device.type == "cuda":
+                # Moving from CPU (float32) to GPU can easily OOM; prefer a narrower dtype.
+                if target_dtype == torch.float32:
+                    if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                        target_dtype = torch.bfloat16
+                        dtype_note = "Switching to bfloat16 on CUDA to reduce memory use."
+                    else:
+                        target_dtype = torch.float16
+                        dtype_note = "Switching to float16 on CUDA to reduce memory use."
+                    args.torch_dtype = target_dtype
+                elif target_dtype == torch.bfloat16 and (
+                    not torch.cuda.is_available() or not torch.cuda.is_bf16_supported()
+                ):
+                    target_dtype = torch.float16
+                    args.torch_dtype = target_dtype
+                    dtype_note = "CUDA bfloat16 unsupported; using float16 instead."
+
             if args.device.type != target_device.type:
                 model.to(device=target_device, dtype=target_dtype)
                 if point_clouds is not None:

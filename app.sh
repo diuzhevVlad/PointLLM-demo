@@ -1,2 +1,8 @@
-PYTHONPATH=$PWD python3 -W ignore pointllm/eval/chat_gradio_minimal.py 
-# --model_name /app/weights/models--RunsenXu--PointLLM_7B_v1.2/snapshots/37d8c15aaff8e7e05f04729dcb6960d5758e9f86 
+#!/usr/bin/env sh
+
+DEVICE_FLAGS=""
+if [ "${START_CPU:-}" = "1" ] || [ "${START_CPU:-}" = "true" ]; then
+    DEVICE_FLAGS="--device cpu --torch_dtype float32"
+fi
+
+PYTHONPATH=$PWD python3 -W ignore pointllm/eval/chat_gradio_minimal.py $DEVICE_FLAGS

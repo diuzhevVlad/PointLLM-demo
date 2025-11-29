@@ -29,6 +29,15 @@ docker compose up
 ```
 3) Wait until all checkpoint shards are loaded, then open http://0.0.0.0:7810 in your browser.
 
+Start with CPU instead of GPU:
+```bash
+START_CPU=1 docker compose up
+```
+If you can't use gpu at all:
+```bash
+START_CPU=1 DOCKER_RUNTIME=runc docker compose up
+```
+
 ## Usage notes
 - Initial model load is slow, even after the cache is populated.
 - You can inspect coordinates directly in the 3D view.
