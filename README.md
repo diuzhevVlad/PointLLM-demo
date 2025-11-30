@@ -13,6 +13,7 @@ Dockerized Gradio demo for [PointLLM](https://runsenxu.com/projects/PointLLM), p
 ## Prerequisites
 - Docker and the Docker Compose plugin installed.
 - ~20 GB free space for the image and another ~20 GB for downloaded weights.
+- Up to 16 Gb GPU
 
 ## Quick start
 1) Load the prebuilt image:
