@@ -7,7 +7,7 @@ Dockerized Gradio demo for [PointLLM](https://runsenxu.com/projects/PointLLM), p
 ## What's inside
 - Two modes: 3D Question Answering and 3D Understanding (coordinate-wise descriptions).
 - Sample point clouds in `data/chosen` (start with a prompt like "Describe point cloud in detail.").
-- Model weights cache to `weights` after first download, enabling offline runs.
+- Model weights cache to `weights` after first download (there may be some warnings while downloading first time), enabling offline runs.
 - Docker setup for quick start; see the original project details in `README_old.md`.
 
 ## Prerequisites
@@ -49,3 +49,4 @@ Then open http://0.0.0.0:8080.
 - You can inspect coordinates directly in the 3D view.
 - CPU inference can take several minutes per reply; use a GPU if available.
 - Extra point clouds live in the Objaverse dataset (see `README_old.md` for details).
+- Original paper can be found [here](http://arxiv.org/abs/2308.16911)
