@@ -27,7 +27,7 @@ docker compose build
 ```bash
 docker compose up
 ```
-3) Wait until all checkpoint shards are loaded, then open http://0.0.0.0:7810 in your browser.
+3) Wait until all checkpoint shards are loaded, then open http://0.0.0.0:7810 in your browser (or the port you choose).
 
 Start with CPU instead of GPU:
 ```bash
@@ -37,6 +37,12 @@ If you can't use gpu at all:
 ```bash
 START_CPU=1 DOCKER_RUNTIME=runc docker compose up
 ```
+
+Use a different port (defaults to 7810):
+```bash
+APP_PORT=8080 docker compose up
+```
+Then open http://0.0.0.0:8080.
 
 ## Usage notes
 - Initial model load is slow, even after the cache is populated.

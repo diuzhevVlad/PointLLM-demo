@@ -9,7 +9,7 @@ services:
     image: vladislavdiuzhev/pointllm-demo
     container_name: pointllm
     ports:
-      - "7810:7810"
+      - "${APP_PORT:-7810}:${APP_PORT:-7810}"
     volumes:
       - .:/app
     runtime: ${DOCKER_RUNTIME:-nvidia}
@@ -19,4 +19,5 @@ services:
       - UID=${UID}
       - GID=${GID}
       - START_CPU=${START_CPU:-}
+      - APP_PORT=${APP_PORT:-7810}
     command: ["/app/app.sh"]
